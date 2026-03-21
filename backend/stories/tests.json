@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "GET stories returns 200",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST story returns 201",
+      "method": "POST",
+      "path": "/",
+      "body": { "category": "Тест", "text": "Тестовая история для автопроверки." },
+      "expectedStatus": 201
+    }
+  ]
+}

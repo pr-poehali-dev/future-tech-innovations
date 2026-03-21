@@ -1,55 +1,7 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
-const stories = [
-  {
-    id: 1,
-    category: "Работа",
-    time: "2 часа назад",
-    text: "Уже полгода работаю на износ, но чувствую, что меня не замечают. Начальник хвалит других, хотя я делаю не меньше. Не знаю, продолжать или уходить.",
-    reactions: 47,
-    comments: 12,
-  },
-  {
-    id: 2,
-    category: "Отношения",
-    time: "5 часов назад",
-    text: "Расстались с парнем после трёх лет вместе. Он сказал, что ему нужно время для себя. Я не понимаю, что я сделала не так. Пустота внутри огромная.",
-    reactions: 83,
-    comments: 21,
-  },
-  {
-    id: 3,
-    category: "Здоровье",
-    time: "вчера",
-    text: "Тревога не отпускает уже несколько месяцев. Просыпаюсь ночью с ощущением, что что-то идёт не так, хотя всё вроде нормально. Устала бояться без причины.",
-    reactions: 61,
-    comments: 18,
-  },
-  {
-    id: 4,
-    category: "Семья",
-    time: "вчера",
-    text: "Мама постоянно сравнивает меня с братом. Он успешный, у него семья и своё дело. А я просто не такой. Чувствую себя лишним в собственной семье.",
-    reactions: 55,
-    comments: 9,
-  },
-  {
-    id: 5,
-    category: "Одиночество",
-    time: "2 дня назад",
-    text: "Переехал в новый город год назад. До сих пор нет друзей. Хожу на работу, возвращаюсь домой. Иногда кажется, что если я исчезну — никто не заметит.",
-    reactions: 102,
-    comments: 34,
-  },
-  {
-    id: 6,
-    category: "Деньги",
-    time: "3 дня назад",
-    text: "Взял кредит на лечение мамы. Теперь отдаю почти всю зарплату. Экономлю на еде. Стыдно говорить об этом вслух, но держать в себе уже невозможно.",
-    reactions: 78,
-    comments: 27,
-  },
-];
+const STORIES_URL = "https://functions.poehali.dev/30c3a833-c1da-4950-ade7-7ab6cb5d1111";
 
 const categoryColors: Record<string, string> = {
   Работа: "bg-blue-100 text-blue-700",
@@ -60,7 +12,43 @@ const categoryColors: Record<string, string> = {
   Деньги: "bg-yellow-100 text-yellow-700",
 };
 
+function timeAgo(isoDate: string) {
+  const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)} мин. назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч. назад`;
+  if (diff < 172800) return "вчера";
+  return `${Math.floor(diff / 86400)} дн. назад`;
+}
+
+interface Story {
+  id: number;
+  category: string;
+  text: string;
+  reactions: number;
+  comments_count: number;
+  created_at: string;
+}
+
 export default function Stories() {
+  const [stories, setStories] = useState<Story[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStories = async (newOffset = 0, append = false) => {
+    setLoading(true);
+    const res = await fetch(`${STORIES_URL}?limit=6&offset=${newOffset}`);
+    const data = await res.json();
+    setStories(prev => append ? [...prev, ...data.stories] : data.stories);
+    setTotal(data.total);
+    setOffset(newOffset + data.stories.length);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStories(0, false);
+  }, []);
+
   return (
     <section className="bg-neutral-50 py-20 px-6">
       <div className="max-w-6xl mx-auto">
@@ -82,10 +70,10 @@ export default function Stories() {
               className="bg-white p-6 flex flex-col gap-4 hover:shadow-md transition-shadow duration-300 cursor-pointer group"
             >
               <div className="flex justify-between items-center">
-                <span className={`text-xs px-3 py-1 rounded-full font-medium ${categoryColors[story.category]}`}>
+                <span className={`text-xs px-3 py-1 rounded-full font-medium ${categoryColors[story.category] ?? "bg-neutral-100 text-neutral-600"}`}>
                   {story.category}
                 </span>
-                <span className="text-xs text-neutral-400">{story.time}</span>
+                <span className="text-xs text-neutral-400">{timeAgo(story.created_at)}</span>
               </div>
 
               <p className="text-neutral-700 text-sm leading-relaxed line-clamp-4 flex-1">
@@ -99,7 +87,7 @@ export default function Stories() {
                 </button>
                 <button className="flex items-center gap-1.5 text-neutral-400 hover:text-neutral-700 transition-colors duration-200 text-sm">
                   <span>💬</span>
-                  <span>{story.comments}</span>
+                  <span>{story.comments_count}</span>
                 </button>
                 <span className="ml-auto text-xs text-neutral-400 group-hover:text-neutral-600 transition-colors duration-200">
                   Читать →
@@ -109,11 +97,20 @@ export default function Stories() {
           ))}
         </div>
 
-        <div className="mt-12 text-center">
-          <button className="border border-neutral-900 text-neutral-900 px-8 py-3 uppercase text-sm tracking-widest hover:bg-neutral-900 hover:text-white transition-all duration-300 cursor-pointer">
-            Показать больше
-          </button>
-        </div>
+        {loading && (
+          <div className="mt-12 text-center text-neutral-400 text-sm">Загружаем истории...</div>
+        )}
+
+        {!loading && offset < total && (
+          <div className="mt-12 text-center">
+            <button
+              onClick={() => fetchStories(offset, true)}
+              className="border border-neutral-900 text-neutral-900 px-8 py-3 uppercase text-sm tracking-widest hover:bg-neutral-900 hover:text-white transition-all duration-300 cursor-pointer"
+            >
+              Показать больше
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

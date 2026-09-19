@@ -3,6 +3,13 @@ import os
 import psycopg2
 
 
+def to_iso(dt):
+    """Конвертирует naive datetime (хранится в БД как UTC) в ISO-строку с суффиксом Z."""
+    if not dt:
+        return None
+    return dt.isoformat() + 'Z'
+
+
 def handler(event: dict, context) -> dict:
     """Получение списка историй, одной истории, добавление истории, реакции и комментариев."""
     if event.get('httpMethod') == 'OPTIONS':
@@ -34,7 +41,7 @@ def handler(event: dict, context) -> dict:
             cur.close()
             conn.close()
             comments = [
-                {'id': r[0], 'text': r[1], 'created_at': r[2].isoformat() if r[2] else None}
+                {'id': r[0], 'text': r[1], 'created_at': to_iso(r[2])}
                 for r in rows
             ]
             return {
@@ -63,7 +70,7 @@ def handler(event: dict, context) -> dict:
                 'text': row[2],
                 'reactions': row[3],
                 'comments_count': row[4],
-                'created_at': row[5].isoformat() if row[5] else None,
+                'created_at': to_iso(row[5]),
             }
             return {
                 'statusCode': 200,
@@ -97,14 +104,13 @@ def handler(event: dict, context) -> dict:
 
         stories = []
         for row in rows:
-            created_at = row[5]
             stories.append({
                 'id': row[0],
                 'category': row[1],
                 'text': row[2],
                 'reactions': row[3],
                 'comments_count': row[4],
-                'created_at': created_at.isoformat() if created_at else None,
+                'created_at': to_iso(row[5]),
             })
 
         return {
@@ -170,7 +176,7 @@ def handler(event: dict, context) -> dict:
             return {
                 'statusCode': 201,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                'body': json.dumps({'id': row[0], 'created_at': row[1].isoformat()}, ensure_ascii=False),
+                'body': json.dumps({'id': row[0], 'created_at': to_iso(row[1])}, ensure_ascii=False),
             }
 
         category = body.get('category', '').strip()
@@ -206,7 +212,7 @@ def handler(event: dict, context) -> dict:
         return {
             'statusCode': 201,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-            'body': json.dumps({'id': row[0], 'created_at': row[1].isoformat()}, ensure_ascii=False),
+            'body': json.dumps({'id': row[0], 'created_at': to_iso(row[1])}, ensure_ascii=False),
         }
 
     cur.close()

@@ -143,6 +143,22 @@ def handler(event: dict, context) -> dict:
                 'body': json.dumps({'reactions': row[0]}, ensure_ascii=False),
             }
 
+        if action == 'report' and story_id:
+            comment_id = body.get('comment_id')
+            cur.execute(
+                "INSERT INTO content_reports (story_id, comment_id) VALUES (%s, %s) RETURNING id",
+                (story_id, comment_id)
+            )
+            row = cur.fetchone()
+            conn.commit()
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 201,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'id': row[0]}, ensure_ascii=False),
+            }
+
         if action == 'comment' and story_id:
             comment_text = body.get('text', '').strip()
             if not comment_text:

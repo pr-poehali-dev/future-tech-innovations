@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import Footer from "@/components/Footer";
+import { useToast } from "@/hooks/use-toast";
 import { STORIES_URL } from "@/config/api";
 import { Story, categoryColors, timeAgo } from "@/lib/storyHelpers";
 
@@ -14,6 +15,7 @@ interface Comment {
 export default function StoryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [story, setStory] = useState<Story | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,8 @@ export default function StoryDetail() {
   const [commentText, setCommentText] = useState("");
   const [sending, setSending] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [reportedStory, setReportedStory] = useState(false);
+  const [reportedComments, setReportedComments] = useState<number[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -50,6 +54,28 @@ export default function StoryDetail() {
     setLiked(true);
     setStory({ ...story, reactions: story.reactions + 1 });
     await fetch(`${STORIES_URL}?id=${id}&action=react`, { method: "POST" });
+  };
+
+  const handleReportStory = async () => {
+    if (reportedStory) return;
+    setReportedStory(true);
+    await fetch(`${STORIES_URL}?id=${id}&action=report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    toast({ title: "Жалоба отправлена", description: "Мы рассмотрим историю в ближайшее время." });
+  };
+
+  const handleReportComment = async (commentId: number) => {
+    if (reportedComments.includes(commentId)) return;
+    setReportedComments(prev => [...prev, commentId]);
+    await fetch(`${STORIES_URL}?id=${id}&action=report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comment_id: commentId }),
+    });
+    toast({ title: "Жалоба отправлена", description: "Мы рассмотрим комментарий в ближайшее время." });
   };
 
   const handleComment = async (e: React.FormEvent) => {
@@ -129,6 +155,16 @@ export default function StoryDetail() {
             <span>💬</span>
             <span>{story.comments_count} комментариев</span>
           </span>
+          <button
+            onClick={handleReportStory}
+            disabled={reportedStory}
+            className={`ml-auto flex items-center gap-1.5 text-xs transition-colors duration-200 ${
+              reportedStory ? "text-neutral-300" : "text-neutral-400 hover:text-red-500 cursor-pointer"
+            }`}
+          >
+            <Icon name="Flag" size={14} />
+            <span>{reportedStory ? "Жалоба отправлена" : "Пожаловаться"}</span>
+          </button>
         </div>
 
         <div className="mt-10">
@@ -159,7 +195,19 @@ export default function StoryDetail() {
               {comments.map((c) => (
                 <div key={c.id} className="bg-white p-5">
                   <p className="text-neutral-700 text-sm leading-relaxed mb-2">{c.text}</p>
-                  <span className="text-xs text-neutral-400">{timeAgo(c.created_at)}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-neutral-400">{timeAgo(c.created_at)}</span>
+                    <button
+                      onClick={() => handleReportComment(c.id)}
+                      disabled={reportedComments.includes(c.id)}
+                      className={`flex items-center gap-1.5 text-xs transition-colors duration-200 ${
+                        reportedComments.includes(c.id) ? "text-neutral-300" : "text-neutral-400 hover:text-red-500 cursor-pointer"
+                      }`}
+                    >
+                      <Icon name="Flag" size={12} />
+                      <span>{reportedComments.includes(c.id) ? "Жалоба отправлена" : "Пожаловаться"}</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

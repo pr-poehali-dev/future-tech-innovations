@@ -1,0 +1,1 @@
+ALTER TABLE stories ADD COLUMN IF NOT EXISTS owner_token VARCHAR(64);

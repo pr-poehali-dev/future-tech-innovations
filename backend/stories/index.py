@@ -17,7 +17,7 @@ def handler(event: dict, context) -> dict:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400',
             },
@@ -52,7 +52,7 @@ def handler(event: dict, context) -> dict:
 
         if story_id:
             cur.execute(
-                "SELECT id, category, text, reactions, comments_count, created_at FROM stories WHERE id = %s",
+                "SELECT id, category, text, reactions, comments_count, created_at, owner_token FROM stories WHERE id = %s",
                 (story_id,)
             )
             row = cur.fetchone()
@@ -64,6 +64,7 @@ def handler(event: dict, context) -> dict:
                     'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
                     'body': json.dumps({'error': 'История не найдена'}, ensure_ascii=False),
                 }
+            owner_token = params.get('owner_token')
             story = {
                 'id': row[0],
                 'category': row[1],
@@ -71,6 +72,7 @@ def handler(event: dict, context) -> dict:
                 'reactions': row[3],
                 'comments_count': row[4],
                 'created_at': to_iso(row[5]),
+                'is_owner': bool(row[6]) and owner_token == row[6],
             }
             return {
                 'statusCode': 200,
@@ -197,6 +199,7 @@ def handler(event: dict, context) -> dict:
 
         category = body.get('category', '').strip()
         text = body.get('text', '').strip()
+        owner_token = body.get('owner_token', '').strip() or None
 
         if not category or not text:
             cur.close()
@@ -217,8 +220,8 @@ def handler(event: dict, context) -> dict:
             }
 
         cur.execute(
-            "INSERT INTO stories (category, text) VALUES (%s, %s) RETURNING id, created_at",
-            (category, text)
+            "INSERT INTO stories (category, text, owner_token) VALUES (%s, %s, %s) RETURNING id, created_at",
+            (category, text, owner_token)
         )
         row = cur.fetchone()
         conn.commit()
@@ -229,6 +232,99 @@ def handler(event: dict, context) -> dict:
             'statusCode': 201,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
             'body': json.dumps({'id': row[0], 'created_at': to_iso(row[1])}, ensure_ascii=False),
+        }
+
+    if event.get('httpMethod') == 'PUT' and story_id:
+        body = json.loads(event.get('body') or '{}')
+        owner_token = body.get('owner_token', '').strip()
+        category = body.get('category', '').strip()
+        text = body.get('text', '').strip()
+
+        if not owner_token:
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 403,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Нет доступа к редактированию'}, ensure_ascii=False),
+            }
+
+        if not category or not text:
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 400,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'category и text обязательны'}, ensure_ascii=False),
+            }
+
+        if len(text) > 1000:
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 400,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Текст не может быть длиннее 1000 символов'}, ensure_ascii=False),
+            }
+
+        cur.execute(
+            "UPDATE stories SET category = %s, text = %s WHERE id = %s AND owner_token = %s RETURNING id",
+            (category, text, story_id, owner_token)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        if not row:
+            return {
+                'statusCode': 403,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Нет доступа к редактированию'}, ensure_ascii=False),
+            }
+
+        return {
+            'statusCode': 200,
+            'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+            'body': json.dumps({'id': row[0]}, ensure_ascii=False),
+        }
+
+    if event.get('httpMethod') == 'DELETE' and story_id:
+        owner_token = params.get('owner_token', '').strip()
+
+        if not owner_token:
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 403,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Нет доступа к удалению'}, ensure_ascii=False),
+            }
+
+        cur.execute(
+            "SELECT id FROM stories WHERE id = %s AND owner_token = %s",
+            (story_id, owner_token)
+        )
+        found = cur.fetchone()
+        if not found:
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 403,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Нет доступа к удалению'}, ensure_ascii=False),
+            }
+
+        cur.execute("DELETE FROM story_comments WHERE story_id = %s", (story_id,))
+        cur.execute("DELETE FROM stories WHERE id = %s", (story_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {
+            'statusCode': 200,
+            'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+            'body': json.dumps({'success': True}, ensure_ascii=False),
         }
 
     cur.close()

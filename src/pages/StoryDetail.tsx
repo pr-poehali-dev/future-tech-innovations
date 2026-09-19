@@ -3,8 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { STORIES_URL } from "@/config/api";
-import { Story, categoryColors, timeAgo } from "@/lib/storyHelpers";
+import { Story, categoryColors, timeAgo, CATEGORIES } from "@/lib/storyHelpers";
+import { getOwnerToken } from "@/lib/ownerToken";
 
 interface Comment {
   id: number;
@@ -25,11 +36,18 @@ export default function StoryDetail() {
   const [notFound, setNotFound] = useState(false);
   const [reportedStory, setReportedStory] = useState(false);
   const [reportedComments, setReportedComments] = useState<number[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [editCategory, setEditCategory] = useState("");
+  const [editText, setEditText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
+    const ownerToken = getOwnerToken();
     const [storyRes, commentsRes] = await Promise.all([
-      fetch(`${STORIES_URL}?id=${id}`),
+      fetch(`${STORIES_URL}?id=${id}&owner_token=${ownerToken}`),
       fetch(`${STORIES_URL}?id=${id}&action=comments`),
     ]);
     if (storyRes.status === 404) {
@@ -76,6 +94,50 @@ export default function StoryDetail() {
       body: JSON.stringify({ comment_id: commentId }),
     });
     toast({ title: "Жалоба отправлена", description: "Мы рассмотрим комментарий в ближайшее время." });
+  };
+
+  const startEditing = () => {
+    if (!story) return;
+    setEditCategory(story.category);
+    setEditText(story.text);
+    setEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!story || !editCategory || !editText.trim()) return;
+    setSaving(true);
+    const res = await fetch(`${STORIES_URL}?id=${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        category: editCategory,
+        text: editText.trim(),
+        owner_token: getOwnerToken(),
+      }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setStory({ ...story, category: editCategory, text: editText.trim() });
+      setEditing(false);
+      toast({ title: "История обновлена" });
+    } else {
+      toast({ title: "Не удалось сохранить изменения", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    const res = await fetch(`${STORIES_URL}?id=${id}&owner_token=${getOwnerToken()}`, {
+      method: "DELETE",
+    });
+    setDeleting(false);
+    setDeleteOpen(false);
+    if (res.ok) {
+      toast({ title: "История удалена" });
+      navigate("/stories");
+    } else {
+      toast({ title: "Не удалось удалить историю", variant: "destructive" });
+    }
   };
 
   const handleComment = async (e: React.FormEvent) => {
@@ -136,9 +198,71 @@ export default function StoryDetail() {
           <span className="text-xs text-neutral-400">{timeAgo(story.created_at)}</span>
         </div>
 
-        <p className="text-neutral-800 text-lg leading-relaxed mb-10 whitespace-pre-line">
-          {story.text}
-        </p>
+        {editing ? (
+          <div className="mb-10 flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setEditCategory(cat)}
+                  className={`px-4 py-2 text-sm border transition-all duration-200 cursor-pointer ${
+                    editCategory === cat
+                      ? "bg-neutral-900 text-white border-neutral-900"
+                      : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              maxLength={1000}
+              rows={8}
+              className="w-full bg-white border border-neutral-200 p-4 text-neutral-800 resize-none focus:outline-none focus:border-neutral-500 transition-colors duration-200 text-sm leading-relaxed"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveEdit}
+                disabled={saving || !editCategory || !editText.trim()}
+                className="bg-neutral-900 text-white px-6 py-3 uppercase text-sm tracking-widest hover:bg-neutral-700 transition-all duration-300 cursor-pointer disabled:opacity-50"
+              >
+                {saving ? "Сохраняем..." : "Сохранить"}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="border border-neutral-300 text-neutral-700 px-6 py-3 uppercase text-sm tracking-widest hover:bg-neutral-100 transition-all duration-300 cursor-pointer"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-neutral-800 text-lg leading-relaxed mb-10 whitespace-pre-line">
+            {story.text}
+          </p>
+        )}
+
+        {story.is_owner && !editing && (
+          <div className="flex items-center gap-4 mb-10 -mt-6">
+            <button
+              onClick={startEditing}
+              className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-900 transition-colors duration-200 cursor-pointer"
+            >
+              <Icon name="Pencil" size={14} />
+              Редактировать
+            </button>
+            <button
+              onClick={() => setDeleteOpen(true)}
+              className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-red-600 transition-colors duration-200 cursor-pointer"
+            >
+              <Icon name="Trash2" size={14} />
+              Удалить
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-6 pb-10 border-b border-neutral-200">
           <button
@@ -215,6 +339,27 @@ export default function StoryDetail() {
         </div>
       </div>
       <Footer />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить историю?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Это действие необратимо. История и все комментарии к ней будут удалены навсегда.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? "Удаляем..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

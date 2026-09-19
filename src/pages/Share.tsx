@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { STORIES_URL } from "@/config/api";
 import { CATEGORIES } from "@/lib/storyHelpers";
+import { getOwnerToken } from "@/lib/ownerToken";
 
 export default function Share() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function Share() {
     const res = await fetch(STORIES_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category, text: text.trim() }),
+      body: JSON.stringify({ category, text: text.trim(), owner_token: getOwnerToken() }),
     });
     setLoading(false);
     if (res.ok) {

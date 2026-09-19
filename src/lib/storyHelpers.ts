@@ -5,6 +5,7 @@ export interface Story {
   reactions: number;
   comments_count: number;
   created_at: string;
+  is_owner?: boolean;
 }
 
 export const CATEGORIES = ["Работа", "Отношения", "Здоровье", "Семья", "Одиночество", "Деньги", "Другое"];

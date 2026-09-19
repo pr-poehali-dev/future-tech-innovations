@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
-
-const STORIES_URL = "https://functions.poehali.dev/30c3a833-c1da-4950-ade7-7ab6cb5d1111";
-
-const CATEGORIES = ["Работа", "Отношения", "Здоровье", "Семья", "Одиночество", "Деньги", "Другое"];
+import { STORIES_URL } from "@/config/api";
+import { CATEGORIES } from "@/lib/storyHelpers";
 
 export default function Share() {
   const navigate = useNavigate();

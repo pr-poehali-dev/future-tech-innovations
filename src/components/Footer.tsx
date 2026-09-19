@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function Footer() {
   return (
     <div
@@ -10,45 +12,45 @@ export default function Footer() {
             <div className="flex shrink-0 gap-8 sm:gap-12 lg:gap-20">
               <div className="flex flex-col gap-1 sm:gap-2">
                 <h3 className="mb-1 sm:mb-2 uppercase text-neutral-400 text-xs sm:text-sm">Платформа</h3>
-                <a
-                  href="#share"
+                <Link
+                  to="/share"
                   className="text-white hover:text-neutral-400 transition-colors duration-300 text-sm sm:text-base"
                 >
                   Поделиться
-                </a>
-                <a
-                  href="#about"
+                </Link>
+                <Link
+                  to="/about"
                   className="text-white hover:text-neutral-400 transition-colors duration-300 text-sm sm:text-base"
                 >
                   О нас
-                </a>
-                <a
-                  href="#contact"
+                </Link>
+                <Link
+                  to="/contacts"
                   className="text-white hover:text-neutral-400 transition-colors duration-300 text-sm sm:text-base"
                 >
                   Связаться
-                </a>
+                </Link>
               </div>
               <div className="flex flex-col gap-1 sm:gap-2">
                 <h3 className="mb-1 sm:mb-2 uppercase text-neutral-400 text-xs sm:text-sm">Сообщество</h3>
-                <a
-                  href="#stories"
+                <Link
+                  to="/stories"
                   className="text-white hover:text-neutral-400 transition-colors duration-300 text-sm sm:text-base"
                 >
                   Истории
-                </a>
-                <a
-                  href="#support"
+                </Link>
+                <Link
+                  to="/contacts"
                   className="text-white hover:text-neutral-400 transition-colors duration-300 text-sm sm:text-base"
                 >
                   Поддержка
-                </a>
-                <a
-                  href="#faq"
+                </Link>
+                <Link
+                  to="/faq"
                   className="text-white hover:text-neutral-400 transition-colors duration-300 text-sm sm:text-base"
                 >
                   FAQ
-                </a>
+                </Link>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 sm:gap-0">
